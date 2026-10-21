@@ -1,352 +1,304 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trang Trại Thú Cưng 3D Kawaii</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+import time
+import random
+import streamlit as st
+
+# Cấu hình trang Streamlit
+st.set_page_config(
+    page_title="Trang Trại Thú Cưng 2D-3D GIFHUD",
+    page_icon="🐾",
+    layout="centered",
+    initial_sidebar_state="expanded"
+)
+
+# --- CSS TÙY CHỈNH GIAO DIỆN (GIFHUD & KUTE STYLE) ---
+st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
-        body { font-family: 'Nunito', sans-serif; user-select: none; overflow: hidden; background: #0f172a; }
-        .glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border: 2px solid rgba(255, 255, 255, 0.6); }
-        @keyframes float { 0%, 100% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(-12px) rotate(2deg); } }
-        .pet-float { animation: float 3s ease-in-out infinite; }
-        @keyframes pulse-glow { 0%, 100% { filter: drop-shadow(0 0 15px rgba(255,182,193,0.8)); } 50% { filter: drop-shadow(0 0 30px rgba(255,105,180,1)); } }
-        .cute-glow { animation: pulse-glow 2s infinite; }
+    .main {
+        background: linear-gradient(135deg, #fbc531 0%, #e84118 100%);
+    }
+    .stButton>button {
+        border-radius: 15px;
+        font-weight: bold;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+    }
+    .pet-card {
+        background: rgba(255, 255, 255, 0.9);
+        padding: 20px;
+        border-radius: 25px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        backdrop-filter: blur(8px);
+        border: 2px solid rgba(255, 255, 255, 0.8);
+        text-align: center;
+    }
+    .title-glow {
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
     </style>
-</head>
-<body class="w-screen h-screen relative flex flex-col justify-between">
+""", unsafe_allow_html=True)
 
-    <!-- MÀN HÌNH CHÍNH BẮT ĐẦU -->
-    <div id="start-screen" class="absolute inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-pink-300 via-purple-300 to-emerald-300 transition-opacity duration-700">
-        <div class="glass p-10 rounded-3xl shadow-2xl text-center max-w-md mx-4 transform hover:scale-105 transition">
-            <div class="text-6xl mb-4 animate-bounce">🐰 🐱 🐷 🐥</div>
-            <h1 class="text-4xl font-black text-pink-600 mb-2">Trang Trại Kawaii 3D</h1>
-            <p class="text-gray-600 font-bold mb-6">Chăm sóc, cho ăn và chơi đùa cùng các bé thú cưng siêu đáng yêu!</p>
-            <button onclick="startGame()" class="w-full py-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-black text-xl rounded-2xl shadow-lg hover:opacity-90 transform active:scale-95 transition">
-                🚀 BẮT ĐẦU CHƠI NGAY
-            </button>
-        </div>
-    </div>
+# --- KHỞI TẠO TRẠNG THÁI GAME (SESSION STATE) ---
+if "game_started" not in st.session_state:
+    st.session_state.game_started = False
+    st.session_state.pet_name = "Mimi"
+    st.session_state.pet_type = "Mèo Chibi 🐱"
+    st.session_state.hunger = 80
+    st.session_state.happiness = 80
+    st.session_state.energy = 80
+    st.session_state.cleanliness = 80
+    st.session_state.coins = 200
+    st.session_state.is_night = False
+    st.session_state.quest_feed_count = 0
+    st.session_state.quest_play_count = 0
+    st.session_state.quest_claimed = [False, False]
+    st.session_state.status_msg = "Chào mừng bạn đến với nông trại 2D-3D tuyệt đẹp!"
+    st.session_state.current_gif = "https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif"
 
-    <!-- KHU VỰC 3D MÔ PHỎNG NÔNG TRẠI -->
-    <div id="world-bg" class="absolute inset-0 transition-colors duration-1000 bg-gradient-to-b from-sky-300 to-emerald-200 flex flex-col items-center justify-center">
-        <!-- Đám mây trôi trang trí -->
-        <div class="absolute top-10 left-10 text-white/80 text-4xl animate-pulse">☁️</div>
-        <div class="absolute top-16 right-20 text-white/80 text-5xl animate-pulse">☁️</div>
+# --- KHO DỮ LIỆU GIF CÁC LOÀI ĐỘNG VẬT CHIBI CUTE ---
+PET_DATABASE = {
+    "Mèo Chibi 🐱": {
+        "normal": "https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif",
+        "eat": "https://media.giphy.com/media/13CoX4K6orM0py/giphy.gif",
+        "play": "https://media.giphy.com/media/5VKbvrjxpUJCM/giphy.gif",
+        "sleep": "https://media.giphy.com/media/MDJ9IbxxvDUQM/giphy.gif",
+        "clean": "https://media.giphy.com/media/8L0Pky6C83SzkzU55a/giphy.gif"
+    },
+    "Thỏ Ngọc 🐰": {
+        "normal": "https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif",
+        "eat": "https://media.giphy.com/media/3o6ZtaO9BZHcOjmErm/giphy.gif",
+        "play": "https://media.giphy.com/media/4Zo41lhzKt6iZ8xff9/giphy.gif",
+        "sleep": "https://media.giphy.com/media/10qyQYDe87nUI/giphy.gif",
+        "clean": "https://media.giphy.com/media/ISOckXUybVfQ4/giphy.gif"
+    },
+    "Heo Sữa 🐷": {
+        "normal": "https://media.giphy.com/media/10rNBP8yt1LOnm/giphy.gif",
+        "eat": "https://media.giphy.com/media/13CoX4K6orM0py/giphy.gif",
+        "play": "https://media.giphy.com/media/9Y5BbDSkSTiY8/giphy.gif",
+        "sleep": "https://media.giphy.com/media/ZVik7n0SM5iO4/giphy.gif",
+        "clean": "https://media.giphy.com/media/3otPoEHWQx0v6dMkFy/giphy.gif"
+    },
+    "Cún Vàng 🐶": {
+        "normal": "https://media.giphy.com/media/8v6Z3YyULB5Q0/giphy.gif",
+        "eat": "https://media.giphy.com/media/3o6ZtaO9BZHcOjmErm/giphy.gif",
+        "play": "https://media.giphy.com/media/3og0IPxMM0erATueVW/giphy.gif",
+        "sleep": "https://media.giphy.com/media/3ohzdWqB150v0a74By/giphy.gif",
+        "clean": "https://media.giphy.com/media/5GoLvjsfT7mlO/giphy.gif"
+    }
+}
+
+# --- 1. MÀN HÌNH CHÍNH (START SCREEN) ---
+if not st.session_state.game_started:
+    st.markdown("<h1 style='text-align: center; color: white;' class='title-glow'>🐾 Nông Trại Thú Cưng 2D-3D (GIFHUD) 🐾</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #f1f2f6; font-size: 18px;'>Trải nghiệm nuôi thú cưng ảo sống động với hiệu ứng động tuyệt đẹp!</p>", unsafe_allow_html=True)
+    
+    # Nhúng âm thanh nền (Background Music) tự động phát qua HTML5 audio
+    st.markdown("""
+        <audio autoplay loop hidden>
+            <source src="https://www.bensound.com/bensound-music/bensound-buddy.mp3" type="audio/mpeg">
+        </audio>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.image("https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif", width=300)
+        selected_type = st.selectbox("🌟 Chọn loài thú cưng khởi đầu:", list(PET_DATABASE.keys()))
+        custom_name = st.text_input("✏️ Đặt tên cho thú cưng:", "Mimi")
         
-        <!-- KHU VỰC HIỂN THỊ THÚ CƯNG 3D (CHIBI MÁ HỒNG CHUẨN ẢNH) -->
-        <div class="relative mt-12 flex flex-col items-center">
-            <!-- Hiệu ứng bóng đổ dưới chân -->
-            <div class="w-48 h-12 bg-black/15 rounded-full blur-md absolute -bottom-4"></div>
-            
-            <!-- Mô hình Thú cưng SVG 3D Layered Chibi Cute -->
-            <div id="pet-avatar-container" class="pet-float cute-glow cursor-pointer transition transform active:scale-95" onclick="petTap()">
-                <svg id="pet-svg" width="240" height="240" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <!-- Thân mèo/thú cưng tròn trĩnh -->
-                    <circle cx="100" cy="110" r="65" fill="#FFF0F5" stroke="#E2A5B8" stroke-width="4"/>
-                    <!-- Tai trái & phải -->
-                    <path d="M55 70L40 30L80 50Z" fill="#FFF0F5" stroke="#E2A5B8" stroke-width="4" stroke-linejoin="round"/>
-                    <path d="M145 70L160 30L120 50Z" fill="#FFF0F5" stroke="#E2A5B8" stroke-width="4" stroke-linejoin="round"/>
-                    <path d="M57 65L47 38L73 52Z" fill="#FFB6C1"/>
-                    <path d="M143 65L153 38L127 52Z" fill="#FFB6C1"/>
-                    <!-- Má hồng lém lỉnh -->
-                    <circle cx="70" cy="115" r="12" fill="#FF69B4" opacity="0.6"/>
-                    <circle cx="130" cy="115" r="12" fill="#FF69B4" opacity="0.6"/>
-                    <!-- Mắt long lanh -->
-                    <circle cx="80" cy="95" r="7" fill="#333333"/>
-                    <circle cx="120" cy="95" r="7" fill="#333333"/>
-                    <circle cx="82" cy="93" r="2.5" fill="white"/>
-                    <circle cx="122" cy="93" r="2.5" fill="white"/>
-                    <!-- Mũi miệng kawaii -->
-                    <path d="M97 105C97 103 103 103 103 105C103 108 97 108 97 105Z" fill="#FF69B4"/>
-                    <path d="M93 112C96 115 104 115 107 112" stroke="#4A3B32" stroke-width="3" stroke-linecap="round"/>
-                </svg>
-            </div>
-            
-            <h2 id="pet-name-tag" class="mt-4 text-2xl font-black text-white drop-shadow-md">Mimi (Mèo Mập)</h2>
-        </div>
-    </div>
+        if st.button("🚀 BẮT ĐẦU VÀO TRANG TRẠI", use_container_width=True):
+            st.session_state.pet_type = selected_type
+            st.session_state.pet_name = custom_name
+            st.session_state.current_gif = PET_DATABASE[selected_type]["normal"]
+            st.session_state.game_started = True
+            st.rerun()
 
-    <!-- GIAO DIỆN HUD ĐIỀU KHIỂN TRONG GAME -->
-    <div id="ui-layer" class="z-20 p-4 flex flex-col justify-between h-full pointer-events-none hidden">
+else:
+    # --- 2. GIAO DIỆN GAME CHÍNH (HUD & NÔNG TRẠI) ---
+    
+    # Nhúng âm thanh nền liên tục trong game
+    st.markdown("""
+        <audio autoplay loop hidden>
+            <source src="https://www.bensound.com/bensound-music/bensound-buddy.mp3" type="audio/mpeg">
+        </audio>
+    """, unsafe_allow_html=True)
+
+    # Header hiển thị thông tin & nút đổi Ngày/Đêm
+    col_h1, col_h2, col_h3 = st.columns([2, 2, 2])
+    with col_h1:
+        time_mode = "🌙 Đêm Lãng Mạn" if st.session_state.is_night else "☀️ Ngày Nắng Đẹp"
+        st.markdown(f"### 🏡 {st.session_state.pet_name} ({st.session_state.pet_type})")
+        st.caption(f"Thời gian: {time_mode}")
+    with col_h2:
+        st.markdown(f"### 🪙 Xu Vàng: {st.session_state.coins}")
+    with col_h3:
+        if st.button("🌗 Chuyển Ngày / Đêm"):
+            st.session_state.is_night = not st.session_state.is_night
+            st.rerun()
+
+    st.markdown("---")
+
+    # Layout hiển thị GIFHUD bên trái và Chỉ số bên phải
+    col_left, col_right = st.columns([1.2, 1.8])
+
+    with col_left:
+        st.markdown(f"""
+        <div class="pet-card">
+            <img src="{st.session_state.current_gif}" width="100%" style="border-radius: 20px; max-height: 240px; object-fit: contain;">
+            <h3 style="margin-top: 12px; color: #2f3640;">{st.session_state.pet_name}</h3>
+        </div>
+        """, unsafe_allow_html=True)
         
-        <!-- Top Navigation -->
-        <div class="flex justify-between items-center pointer-events-auto">
-            <div class="glass px-5 py-3 rounded-2xl shadow-lg flex items-center gap-3">
-                <span class="text-2xl" id="hud-emoji">🐱</span>
-                <div>
-                    <h3 class="font-black text-gray-800 text-sm" id="hud-name">Mimi</h3>
-                    <div class="flex gap-2 mt-0.5">
-                        <span id="time-badge" class="text-xs font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">☀️ Ban Ngày</span>
-                        <span id="coin-badge" class="text-xs font-bold bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">🪙 150 Xu</span>
-                    </div>
-                </div>
-            </div>
+        st.info(f"💬 **Trạng thái:** {st.session_state.status_msg}")
 
-            <div class="flex gap-2">
-                <button onclick="toggleShop()" class="glass px-4 py-3 rounded-2xl font-black text-purple-600 shadow-lg hover:bg-purple-50 transition">🛍️ Cửa Hàng</button>
-                <button onclick="toggleQuests()" class="glass px-4 py-3 rounded-2xl font-black text-emerald-600 shadow-lg hover:bg-emerald-50 transition">📜 Nhiệm Vụ</button>
-            </div>
-        </div>
+    with col_right:
+        st.subheader("📊 Bảng Chỉ Số Sức Khỏe")
+        
+        # Giới hạn chỉ số từ 0 đến 100
+        st.session_state.hunger = max(0, min(100, st.session_state.hunger))
+        st.session_state.happiness = max(0, min(100, st.session_state.happiness))
+        st.session_state.energy = max(0, min(100, st.session_state.energy))
+        st.session_state.cleanliness = max(0, min(100, st.session_state.cleanliness))
 
-        <!-- Thông báo giữa màn hình -->
-        <div id="toast" class="self-center glass px-6 py-2 rounded-full shadow-lg font-bold text-gray-800 text-sm transition-all duration-300 opacity-0 transform -translate-y-4">
-            Chào mừng bạn đến với nông trại!
-        </div>
+        st.write(f"🍖 Độ No (Hunger): {st.session_state.hunger}/100")
+        st.progress(st.session_state.hunger)
 
-        <!-- Bottom Dashboard Panel -->
-        <div class="glass p-5 rounded-3xl shadow-xl pointer-events-auto max-w-2xl mx-auto w-full flex flex-col gap-3">
-            <!-- Thanh chỉ số -->
-            <div class="grid grid-cols-3 gap-4">
-                <div>
-                    <div class="flex justify-between text-xs font-bold text-gray-700 mb-1">
-                        <span>🍖 No Nê</span> <span id="hunger-txt">80/100</span>
-                    </div>
-                    <div class="w-full bg-gray-200 h-3 rounded-full overflow-hidden">
-                        <div id="hunger-bar" class="bg-amber-500 h-full w-4/5 transition-all"></div>
-                    </div>
-                </div>
-                <div>
-                    <div class="flex justify-between text-xs font-bold text-gray-700 mb-1">
-                        <span>⭐ Vui Vẻ</span> <span id="happy-txt">80/100</span>
-                    </div>
-                    <div class="w-full bg-gray-200 h-3 rounded-full overflow-hidden">
-                        <div id="happy-bar" class="bg-pink-500 h-full w-4/5 transition-all"></div>
-                    </div>
-                </div>
-                <div>
-                    <div class="flex justify-between text-xs font-bold text-gray-700 mb-1">
-                        <span>⚡ Năng Lượng</span> <span id="energy-txt">80/100</span>
-                    </div>
-                    <div class="w-full bg-gray-200 h-3 rounded-full overflow-hidden">
-                        <div id="energy-bar" class="bg-cyan-500 h-full w-4/5 transition-all"></div>
-                    </div>
-                </div>
-            </div>
+        st.write(f"⭐ Vui Vẻ (Happiness): {st.session_state.happiness}/100")
+        st.progress(st.session_state.happiness)
 
-            <!-- Các nút hành động chăm sóc -->
-            <div class="grid grid-cols-4 gap-3 pt-1">
-                <button onclick="feedPet()" class="py-3 bg-amber-400 hover:bg-amber-500 text-white font-black rounded-2xl shadow transition transform active:scale-95">🍖 Cho Ăn (-10🪙)</button>
-                <button onclick="playPet()" class="py-3 bg-pink-400 hover:bg-pink-500 text-white font-black rounded-2xl shadow transition transform active:scale-95">🎾 Chơi Đùa</button>
-                <button onclick="sleepPet()" class="py-3 bg-indigo-400 hover:bg-indigo-500 text-white font-black rounded-2xl shadow transition transform active:scale-95">💤 Đi Ngủ</button>
-                <button onclick="cleanPet()" class="py-3 bg-emerald-400 hover:bg-emerald-500 text-white font-black rounded-2xl shadow transition transform active:scale-95">✨ Dọn Vệ Sinh</button>
-            </div>
-        </div>
-    </div>
+        st.write(f"⚡ Năng Lượng (Energy): {st.session_state.energy}/100")
+        st.progress(st.session_state.energy)
 
-    <!-- CỬA HÀNG MODAL -->
-    <div id="shop-modal" class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
-        <div class="glass p-6 rounded-3xl max-w-md w-full shadow-2xl relative">
-            <button onclick="toggleShop()" class="absolute top-4 right-4 text-gray-500 hover:text-black font-black text-xl">✕</button>
-            <h3 class="text-2xl font-black text-purple-700 mb-4">🛍️ Cửa Hàng Thú Cưng</h3>
-            <div class="space-y-3 max-h-96 overflow-y-auto pr-1">
-                <div class="flex justify-between items-center p-3 bg-white/70 rounded-2xl">
-                    <div class="flex items-center gap-3"><span class="text-3xl">🐱</span><div><h4 class="font-bold">Mèo Mập Mimi</h4><p class="text-xs text-gray-500">Đáng yêu, dễ nuôi</p></div></div>
-                    <button onclick="changePet('Mimi', '🐱', 'cat')" class="px-3 py-1.5 bg-purple-600 text-white font-bold rounded-xl text-sm">Chọn</button>
-                </div>
-                <div class="flex justify-between items-center p-3 bg-white/70 rounded-2xl">
-                    <div class="flex items-center gap-3"><span class="text-3xl">🐰</span><div><h4 class="font-bold">Thỏ Hồng Bouncy</h4><p class="text-xs text-gray-500">Năng động, thích nhảy</p></div></div>
-                    <button onclick="changePet('Bouncy', '🐰', 'rabbit')" class="px-3 py-1.5 bg-purple-600 text-white font-bold rounded-xl text-sm">Mua (50🪙)</button>
-                </div>
-                <div class="flex justify-between items-center p-3 bg-white/70 rounded-2xl">
-                    <div class="flex items-center gap-3"><span class="text-3xl">🐷</span><div><h4 class="font-bold">Heo Sữa Ú Nu</h4><p class="text-xs text-gray-500">Mập mạp tròn xoe</p></div></div>
-                    <button onclick="changePet('Ú Nu', '🐷', 'pig')" class="px-3 py-1.5 bg-purple-600 text-white font-bold rounded-xl text-sm">Mua (50🪙)</button>
-                </div>
-                <div class="flex justify-between items-center p-3 bg-white/70 rounded-2xl">
-                    <div class="flex items-center gap-3"><span class="text-3xl">🐥</span><div><h4 class="font-bold">Gà Vàng Chip</h4><p class="text-xs text-gray-500">Tinh nghịch, lém lỉnh</p></div></div>
-                    <button onclick="changePet('Chip', '🐥', 'chick')" class="px-3 py-1.5 bg-purple-600 text-white font-bold rounded-xl text-sm">Mua (50🪙)</button>
-                </div>
-            </div>
-        </div>
-    </div>
+        st.write(f"✨ Sạch Sẽ (Cleanliness): {st.session_state.cleanliness}/100")
+        st.progress(st.session_state.cleanliness)
 
-    <!-- NHIỆM VỤ MODAL -->
-    <div id="quest-modal" class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
-        <div class="glass p-6 rounded-3xl max-w-md w-full shadow-2xl relative">
-            <button onclick="toggleQuests()" class="absolute top-4 right-4 text-gray-500 hover:text-black font-black text-xl">✕</button>
-            <h3 class="text-2xl font-black text-emerald-700 mb-4">📜 Nhiệm Vụ Hàng Ngày</h3>
-            <div class="space-y-3">
-                <div class="flex justify-between items-center p-3 bg-white/70 rounded-2xl">
-                    <div><h4 class="font-bold text-gray-800">Cho thú cưng ăn 3 lần</h4><p class="text-xs text-gray-500" id="q1-desc">Tiến độ: 0/3</p></div>
-                    <button id="q1-btn" onclick="claimQuest(1, 30)" class="px-3 py-1.5 bg-gray-300 text-gray-600 font-bold rounded-xl text-sm cursor-not-allowed" disabled>Nhận 30🪙</button>
-                </div>
-                <div class="flex justify-between items-center p-3 bg-white/70 rounded-2xl">
-                    <div><h4 class="font-bold text-gray-800">Chơi đùa 2 lần</h4><p class="text-xs text-gray-500" id="q2-desc">Tiến độ: 0/2</p></div>
-                    <button id="q2-btn" onclick="claimQuest(2, 40)" class="px-3 py-1.5 bg-gray-300 text-gray-600 font-bold rounded-xl text-sm cursor-not-allowed" disabled>Nhận 40🪙</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    st.markdown("---")
 
-    <!-- JAVASCRIPT GAME LOGIC -->
-    <script>
-        let coins = 150;
-        let hunger = 80;
-        let happy = 80;
-        let energy = 80;
-        let petName = "Mimi";
-        let petType = "cat";
-        let isNight = false;
+    # --- 3. BẢNG ĐIỀU KHIỂN HÀNH ĐỘNG CHĂM SÓC ---
+    st.subheader("🎮 Hành Động Chăm Sóc")
+    b1, b2, b3, b4 = st.columns(4)
 
-        let quests = { feed: 0, play: 0, q1Done: false, q2Done: false };
+    with b1:
+        if st.button("🍖 Cho Ăn (-10🪙)", use_container_width=True):
+            if st.session_state.coins >= 10:
+                st.session_state.coins -= 10
+                st.session_state.hunger = min(100, st.session_state.hunger + 30)
+                st.session_state.energy = min(100, st.session_state.energy + 5)
+                st.session_state.quest_feed_count += 1
+                st.session_state.current_gif = PET_DATABASE[st.session_state.pet_type]["eat"]
+                st.session_state.status_msg = f"Ngon quá! {st.session_state.pet_name} đang thưởng thức đồ ăn."
+                st.rerun()
+            else:
+                st.warning("Bạn không đủ xu để mua thức ăn!")
 
-        // Web Audio API Tổng hợp âm thanh vui nhộn
-        let audioCtx = null;
-        function playSound(type) {
-            try {
-                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                let osc = audioCtx.createOscillator();
-                let gain = audioCtx.createGain();
-                osc.connect(gain); gain.connect(audioCtx.destination);
-                let now = audioCtx.currentTime;
+    with b2:
+        if st.button("🎾 Chơi Đùa", use_container_width=True):
+            if st.session_state.energy >= 15:
+                st.session_state.happiness = min(100, st.session_state.happiness + 25)
+                st.session_state.energy -= 15
+                st.session_state.hunger = max(0, st.session_state.hunger - 10)
+                st.session_state.coins += 20
+                st.session_state.quest_play_count += 1
+                st.session_state.current_gif = PET_DATABASE[st.session_state.pet_type]["play"]
+                st.session_state.status_msg = f"Tuyệt vời! {st.session_state.pet_name} chơi vui vẻ và kiếm được 20🪙."
+                st.rerun()
+            else:
+                st.warning(f"{st.session_state.pet_name} đã mệt, hãy cho bé đi ngủ nhé!")
 
-                if (type === 'click') {
-                    osc.frequency.setValueAtTime(400, now); osc.frequency.exponentialRampToValueAtTime(700, now + 0.1);
-                    gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
-                    osc.start(now); osc.stop(now + 0.1);
-                } else if (type === 'success') {
-                    osc.frequency.setValueAtTime(523.25, now); osc.frequency.setValueAtTime(659.25, now + 0.1); osc.frequency.setValueAtTime(783.99, now + 0.2);
-                    gain.gain.setValueAtTime(0.15, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
-                    osc.start(now); osc.stop(now + 0.3);
-                }
-            } catch(e) {}
-        }
+    with b3:
+        if st.button("💤 Đi Ngủ", use_container_width=True):
+            st.session_state.energy = 100
+            st.session_state.hunger = max(0, st.session_state.hunger - 15)
+            st.session_state.current_gif = PET_DATABASE[st.session_state.pet_type]["sleep"]
+            st.session_state.status_msg = f"Khò khò... {st.session_state.pet_name} đang ngủ một giấc thật sâu."
+            st.rerun()
 
-        function startGame() {
-            playSound('success');
-            document.getElementById('start-screen').classList.add('opacity-0', 'pointer-events-none');
-            setTimeout(() => document.getElementById('start-screen').style.display = 'none', 700);
-            document.getElementById('ui-layer').classList.remove('hidden');
-            showToast("Chào mừng bạn đến với thế giới thú cưng 3D!");
-        }
+    with b4:
+        if st.button("🚿 Tắm Rửa", use_container_width=True):
+            st.session_state.cleanliness = 100
+            st.session_state.happiness = min(100, st.session_state.happiness + 15)
+            st.session_state.coins += 10
+            st.session_state.current_gif = PET_DATABASE[st.session_state.pet_type]["clean"]
+            st.session_state.status_msg = f"Thơm tho sạch sẽ! {st.session_state.pet_name} rất thích tắm."
+            st.rerun()
 
-        function showToast(msg) {
-            let t = document.getElementById('toast');
-            t.innerText = msg;
-            t.classList.remove('opacity-0', '-translate-y-4');
-            setTimeout(() => t.classList.add('opacity-0', '-translate-y-4'), 2500);
-        }
+    st.markdown("---")
 
-        function updateUI() {
-            document.getElementById('coin-badge').innerText = `🪙 ${coins} Xu`;
-            document.getElementById('hunger-txt').innerText = `${hunger}/100`;
-            document.getElementById('hunger-bar').style.width = `${hunger}%`;
-            document.getElementById('happy-txt').innerText = `${happy}/100`;
-            document.getElementById('happy-bar').style.width = `${happy}%`;
-            document.getElementById('energy-txt').innerText = `${energy}/100`;
-            document.getElementById('energy-bar').style.width = `${energy}%`;
+    # --- 4. CỬA HÀNG VÀ THANH NHIỆM VỤ ---
+    tab_shop, tab_quest = st.tabs(["🛍️ Cửa Hàng Thú Cưng", "📜 Thanh Nhiệm Vụ Kiếm Xu"])
 
-            // Kiểm tra nhiệm vụ
-            if (quests.feed >= 3 && !quests.q1Done) {
-                let btn = document.getElementById('q1-btn');
-                btn.className = "px-3 py-1.5 bg-emerald-600 text-white font-bold rounded-xl text-sm hover:bg-emerald-700";
-                btn.removeAttribute('disabled');
-            }
-            document.getElementById('q1-desc').innerText = `Tiến độ: ${quests.feed}/3`;
+    with tab_shop:
+        st.write("Đổi hoặc nhận nuôi thêm các bé thú cưng siêu cute khác:")
+        sc1, sc2, sc3, sc4 = st.columns(4)
+        with sc1:
+            if st.button("Nhận nuôi Mèo 🐱 (50🪙)") and st.session_state.coins >= 50:
+                st.session_state.coins -= 50
+                st.session_state.pet_type = "Mèo Chibi 🐱"
+                st.session_state.pet_name = "Mimi"
+                st.session_state.current_gif = PET_DATABASE["Mèo Chibi 🐱"]["normal"]
+                st.rerun()
+        with sc2:
+            if st.button("Nhận nuôi Thỏ 🐰 (50🪙)") and st.session_state.coins >= 50:
+                st.session_state.coins -= 50
+                st.session_state.pet_type = "Thỏ Ngọc 🐰"
+                st.session_state.pet_name = "Bouncy"
+                st.session_state.current_gif = PET_DATABASE["Thỏ Ngọc 🐰"]["normal"]
+                st.rerun()
+        with sc3:
+            if st.button("Nhận nuôi Heo 🐷 (50🪙)") and st.session_state.coins >= 50:
+                st.session_state.coins -= 50
+                st.session_state.pet_type = "Heo Sữa 🐷"
+                st.session_state.pet_name = "Ú Nu"
+                st.session_state.current_gif = PET_DATABASE["Heo Sữa 🐷"]["normal"]
+                st.rerun()
+        with sc4:
+            if st.button("Nhận nuôi Cún 🐶 (50🪙)") and st.session_state.coins >= 50:
+                st.session_state.coins -= 50
+                st.session_state.pet_type = "Cún Vàng 🐶"
+                st.session_state.pet_name = "Bobby"
+                st.session_state.current_gif = PET_DATABASE["Cún Vàng 🐶"]["normal"]
+                st.rerun()
 
-            if (quests.play >= 2 && !quests.q2Done) {
-                let btn = document.getElementById('q2-btn');
-                btn.className = "px-3 py-1.5 bg-emerald-600 text-white font-bold rounded-xl text-sm hover:bg-emerald-700";
-                btn.removeAttribute('disabled');
-            }
-            document.getElementById('q2-desc').innerText = `Tiến độ: ${quests.play}/2`;
-        }
+    with tab_quest:
+        st.write("Hoàn thành các mốc thử thách để nhận xu thưởng:")
+        
+        # Nhiệm vụ 1: Cho ăn 3 lần
+        qc1, qc2 = st.columns([3, 1])
+        with qc1:
+            st.write(f"🍖 **Cho thú cưng ăn 3 lần** (Tiến độ: {st.session_state.quest_feed_count}/3)")
+        with qc2:
+            if st.session_state.quest_feed_count >= 3 and not st.session_state.quest_claimed[0]:
+                if st.button("Nhận 30🪙", key="q1"):
+                    st.session_state.coins += 30
+                    st.session_state.quest_claimed[0] = True
+                    st.success("Nhận thưởng thành công!")
+                    st.rerun()
+            elif st.session_state.quest_claimed[0]:
+                st.write("✅ Đã nhận")
+            else:
+                st.write("🔒 Chưa xong")
 
-        function petTap() {
-            happy = Math.min(100, happy + 5);
-            playSound('click');
-            showToast(`${petName} kêu gừ gừ rất thích thú!`);
-            updateUI();
-        }
+        # Nhiệm vụ 2: Chơi đùa 2 lần
+        qc3, qc4 = st.columns([3, 1])
+        with qc3:
+            st.write(f"🎾 **Chơi đùa với thú cưng 2 lần** (Tiến độ: {st.session_state.quest_play_count}/2)")
+        with qc4:
+            if st.session_state.quest_play_count >= 2 and not st.session_state.quest_claimed[1]:
+                if st.button("Nhận 40🪙", key="q2"):
+                    st.session_state.coins += 40
+                    st.session_state.quest_claimed[1] = True
+                    st.success("Nhận thưởng thành công!")
+                    st.rerun()
+            elif st.session_state.quest_claimed[1]:
+                st.write("✅ Đã nhận")
+            else:
+                st.write("🔒 Chưa xong")
 
-        function feedPet() {
-            if (coins < 10) { showToast("Bạn không đủ 10 xu!"); return; }
-            coins -= 10;
-            hunger = Math.min(100, hunger + 25);
-            quests.feed++;
-            playSound('success');
-            showToast(`Yummy! ${petName} đã ăn rất ngon.`);
-            updateUI();
-        }
-
-        function playPet() {
-            happy = Math.min(100, happy + 20);
-            energy = Math.max(0, energy - 10);
-            coins += 15;
-            quests.play++;
-            playSound('success');
-            showToast(`${petName} chơi đùa vui vẻ và kiếm được 15 xu!`);
-            updateUI();
-        }
-
-        function sleepPet() {
-            energy = 100;
-            hunger = Math.max(0, hunger - 15);
-            isNight = !isNight;
-            let bg = document.getElementById('world-bg');
-            let badge = document.getElementById('time-badge');
-            if (isNight) {
-                bg.className = "absolute inset-0 transition-colors duration-1000 bg-gradient-to-b from-indigo-950 to-slate-900 flex flex-col items-center justify-center";
-                badge.className = "text-xs font-bold bg-indigo-900 text-indigo-200 px-2 py-0.5 rounded-full";
-                badge.innerText = "🌙 Ban Đêm";
-                showToast(`Khò khò... ${petName} đã đi ngủ ngon giấc.`);
-            } else {
-                bg.className = "absolute inset-0 transition-colors duration-1000 bg-gradient-to-b from-sky-300 to-emerald-200 flex flex-col items-center justify-center";
-                badge.className = "text-xs font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full";
-                badge.innerText = "☀️ Ban Ngày";
-                showToast(`Chào buổi sáng! ${petName} đã thức dậy.`);
-            }
-            updateUI();
-        }
-
-        function cleanPet() {
-            happy = Math.min(100, happy + 10);
-            coins += 5;
-            playSound('success');
-            showToast(`Sạch sẽ thơm tho! Nhận 5 xu.`);
-            updateUI();
-        }
-
-        function toggleShop() { document.getElementById('shop-modal').classList.toggle('hidden'); }
-        function toggleQuests() { document.getElementById('quest-modal').classList.toggle('hidden'); }
-
-        function changePet(name, emoji, type) {
-            petName = name;
-            petType = type;
-            document.getElementById('hud-emoji').innerText = emoji;
-            document.getElementById('hud-name').innerText = name;
-            document.getElementById('pet-name-tag').innerText = `${name} (${emoji})`;
-            
-            // Thay đổi SVG hình dáng phù hợp
-            let svg = document.getElementById('pet-svg');
-            if (type === 'rabbit') {
-                svg.innerHTML = `<circle cx="100" cy="110" r="60" fill="#FFF0F5" stroke="#E2A5B8" stroke-width="4"/><path d="M75 55L70 15C70 10 90 10 90 25L85 55Z" fill="#FFF0F5" stroke="#E2A5B8" stroke-width="3"/><path d="M125 55L130 15C130 10 110 10 110 25L115 55Z" fill="#FFF0F5" stroke="#E2A5B8" stroke-width="3"/><circle cx="70" cy="110" r="10" fill="#FF69B4" opacity="0.6"/><circle cx="130" cy="110" r="10" fill="#FF69B4" opacity="0.6"/><circle cx="80" cy="95" r="6" fill="#33"/><circle cx="120" cy="95" r="6" fill="#33"/><path d="M97 105C97 103 103 103 103 105C103 108 97 108 97 105Z" fill="#FF69B4"/><path d="M94 112L106 112" stroke="#333" stroke-width="3" stroke-linecap="round"/>`;
-            } else if (type === 'pig') {
-                svg.innerHTML = `<circle cx="100" cy="110" r="65" fill="#FFC0CB" stroke="#E095A5" stroke-width="4"/><ellipse cx="70" cy="65" rx="15" ry="12" fill="#FFB6C1"/><ellipse cx="130" cy="65" rx="15" ry="12" fill="#FFB6C1"/><circle cx="70" cy="115" r="12" fill="#FF69B4" opacity="0.5"/><circle cx="130" cy="115" r="12" fill="#FF69B4" opacity="0.5"/><circle cx="80" cy="95" r="6" fill="#33"/><circle cx="120" cy="95" r="6" fill="#33"/><ellipse cx="100" cy="110" rx="14" ry="10" fill="#FF94B8"/><circle cx="95" cy="110" r="2" fill="#D87093"/><circle cx="105" cy="110" r="2" fill="#D87093"/>`;
-            } else if (type === 'chick') {
-                svg.innerHTML = `<circle cx="100" cy="110" r="60" fill="#FFD700" stroke="#E5B800" stroke-width="4"/><circle cx="70" cy="110" r="10" fill="#FF8C00" opacity="0.6"/><circle cx="130" cy="110" r="10" fill="#FF8C00" opacity="0.6"/><circle cx="80" cy="95" r="6" fill="#33"/><circle cx="120" cy="95" r="6" fill="#33"/><polygon points="95,105 105,105 100,115" fill="#FF8C00"/>`;
-            }
-            
-            playSound('success');
-            showToast(`Đã đổi sang bé ${name} thành công!`);
-            toggleShop();
-            updateUI();
-        }
-
-        function claimQuest(id, reward) {
-            coins += reward;
-            if (id === 1) {
-                quests.q1Done = true;
-                let b = document.getElementById('q1-btn'); b.innerText = "Đã Nhận"; b.className = "px-3 py-1.5 bg-gray-300 text-gray-500 font-bold rounded-xl text-sm cursor-not-allowed"; b.setAttribute('disabled', 'true');
-            } else if (id === 2) {
-                quests.q2Done = true;
-                let b = document.getElementById('q2-btn'); b.innerText = "Đã Nhận"; b.className = "px-3 py-1.5 bg-gray-300 text-gray-500 font-bold rounded-xl text-sm cursor-not-allowed"; b.setAttribute('disabled', 'true');
-            }
-            playSound('success');
-            showToast(`Nhận thành công ${reward} xu thưởng nhiệm vụ!`);
-            updateUI();
-        }
-    </script>
-</body>
-</html>
+    # Sidebar cài đặt hệ thống
+    with st.sidebar:
+        st.header("⚙️ Cài Đặt Hệ Thống")
+        if st.button("🔄 Chơi Lại Từ Đầu"):
+            st.session_state.clear()
+            st.rerun()
