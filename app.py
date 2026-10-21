@@ -1220,3 +1220,7 @@
 </html>
 ```
 eof
+File "/mount/src/ch-n-nu-i-/app.py", line 6
+      <title>Trang Trại Thú Cưng 3D Nâng Cấp</title>
+                                 ^
+SyntaxError: invalid decimal literal
